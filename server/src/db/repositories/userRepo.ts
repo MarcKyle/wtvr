@@ -1,6 +1,15 @@
 import type { RowDataPacket, ResultSetHeader } from 'mysql2'
 import { pool } from '../pool.js'
 
+export type UserStats = {
+  totalUsers: number
+  activeUsers: number
+  totalAuthors: number
+  totalReaders: number
+  totalPosts: number
+  publishedPosts: number
+}
+
 export type DbUser = {
   id: number
   email: string
@@ -9,6 +18,10 @@ export type DbUser = {
   isActive: boolean
   failedAttempts: number
   lockedUntil: Date | null
+  displayName: string | null
+  bio: string | null
+  website: string | null
+  location: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -21,6 +34,10 @@ type UserJoinRow = RowDataPacket & {
   is_active: number
   failed_attempts: number
   locked_until: Date | null
+  display_name: string | null
+  bio: string | null
+  website: string | null
+  location: string | null
   created_at: Date
   updated_at: Date
 }
@@ -28,6 +45,7 @@ type UserJoinRow = RowDataPacket & {
 const SELECT_USER = `
   SELECT u.id, u.email, u.password_hash, r.name AS role_name,
          u.is_active, u.failed_attempts, u.locked_until,
+         u.display_name, u.bio, u.website, u.location,
          u.created_at, u.updated_at
     FROM users u
     JOIN roles r ON r.id = u.role_id
@@ -42,6 +60,10 @@ function mapUser(row: UserJoinRow): DbUser {
     isActive: row.is_active === 1,
     failedAttempts: row.failed_attempts,
     lockedUntil: row.locked_until,
+    displayName: row.display_name,
+    bio: row.bio,
+    website: row.website,
+    location: row.location,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -102,5 +124,72 @@ export const userRepo = {
        WHERE id = ?`,
       [userId],
     )
+  },
+
+  /** Update editable profile fields for a user. Only non-undefined keys are written. */
+  async updateProfile(
+    userId: number,
+    fields: {
+      displayName?: string | null
+      bio?: string | null
+      website?: string | null
+      location?: string | null
+    },
+  ): Promise<DbUser> {
+    const setClauses: string[] = []
+    const params: (string | number | null)[] = []
+
+    if (fields.displayName !== undefined) { setClauses.push('display_name = ?'); params.push(fields.displayName) }
+    if (fields.bio         !== undefined) { setClauses.push('bio = ?');          params.push(fields.bio) }
+    if (fields.website     !== undefined) { setClauses.push('website = ?');      params.push(fields.website) }
+    if (fields.location    !== undefined) { setClauses.push('location = ?');     params.push(fields.location) }
+
+    if (setClauses.length === 0) {
+      const user = await this.findById(userId)
+      if (!user) throw new Error('User not found')
+      return user
+    }
+
+    params.push(userId)
+    await pool.execute(
+      `UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`,
+      params,
+    )
+
+    const updated = await this.findById(userId)
+    if (!updated) throw new Error('User not found after update')
+    return updated
+  },
+
+  /** Aggregate counts used by the admin dashboard. */
+  async getStats(): Promise<UserStats> {    const [[userRow]] = await pool.execute<(RowDataPacket & {
+      total: number; active: number; authors: number; readers: number
+    })[]>(
+      `SELECT
+         COUNT(*)                                          AS total,
+         SUM(u.is_active = 1)                             AS active,
+         SUM(r.name = 'author')                           AS authors,
+         SUM(r.name = 'reader')                           AS readers
+       FROM users u
+       JOIN roles r ON r.id = u.role_id`,
+    )
+
+    const [[postRow]] = await pool.execute<(RowDataPacket & {
+      total: number; published: number
+    })[]>(
+      `SELECT
+         COUNT(*)                          AS total,
+         SUM(status = 'published')         AS published
+       FROM posts`,
+    )
+
+    return {
+      totalUsers:     userRow?.total     ?? 0,
+      activeUsers:    userRow?.active    ?? 0,
+      totalAuthors:   userRow?.authors   ?? 0,
+      totalReaders:   userRow?.readers   ?? 0,
+      totalPosts:     postRow?.total     ?? 0,
+      publishedPosts: postRow?.published ?? 0,
+    }
   },
 }

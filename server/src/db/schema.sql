@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS users (
   is_active       TINYINT(1) NOT NULL DEFAULT 1,
   failed_attempts INT UNSIGNED NOT NULL DEFAULT 0,
   locked_until    DATETIME NULL,
+  display_name    VARCHAR(100) NULL,
+  bio             TEXT NULL,
+  website         VARCHAR(255) NULL,
+  location        VARCHAR(100) NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                   ON UPDATE CURRENT_TIMESTAMP,
@@ -48,6 +52,21 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   INDEX idx_logs_created (created_at),
   CONSTRAINT fk_logs_user FOREIGN KEY (user_id) REFERENCES users(id)
                           ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS posts (
+  id          INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  author_id   INT UNSIGNED NOT NULL,
+  title       VARCHAR(160) NOT NULL,
+  body        TEXT NOT NULL,
+  status      ENUM('draft','published','hidden') NOT NULL DEFAULT 'draft',
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+              ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_posts_author FOREIGN KEY (author_id) REFERENCES users(id)
+                             ON DELETE CASCADE,
+  INDEX idx_posts_author (author_id),
+  INDEX idx_posts_status_created (status, created_at)
 ) ENGINE=InnoDB;
 
 INSERT IGNORE INTO roles (name, description) VALUES

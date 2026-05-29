@@ -4,6 +4,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
 import { homeForRole } from '../../routes/homeForRole'
 import { isValidEmail } from '../../utils/validators'
+import { getErrorMessage } from '../../constants/errors'
+import { ApiError } from '../../lib/api'
 import Button from '../../components/common/Button'
 import Loader from '../../components/common/Loader'
 
@@ -41,8 +43,12 @@ function Login() {
       const authed = await login({ email, password })
       navigate(from ?? homeForRole(authed.role), { replace: true })
     } catch (err) {
-      // Keep the message generic to avoid leaking which field was wrong.
-      setError(err instanceof Error ? err.message : 'Sign in failed.')
+      // MKJ 05/29/26 Map error code to user-friendly message
+      if (err instanceof ApiError) {
+        setError(getErrorMessage(err.code))
+      } else {
+        setError(err instanceof Error ? err.message : 'Sign in failed.')
+      }
     } finally {
       setSubmitting(false)
     }

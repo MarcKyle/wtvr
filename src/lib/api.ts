@@ -1,9 +1,23 @@
-// Minimal fetch wrapper. Sends/receives JSON and uses cookie-based sessions
-// by default. Configure the Vite dev server to proxy /api -> backend.
+// MKJ 05/29/26 Minimal fetch wrapper for JSON requests with error code support
+// Sends/receives JSON and uses cookie-based sessions by default.
+// Configure the Vite dev server to proxy /api -> backend.
 const BASE_URL = '/api'
 
 export type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown
+}
+
+// MKJ 05/29/26 Error response structure from server
+export class ApiError extends Error {
+  code: string
+  status: number
+
+  constructor(code: string, message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.code = code
+    this.status = status
+  }
 }
 
 export async function request<T>(
@@ -24,8 +38,21 @@ export async function request<T>(
   })
 
   if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText)
-    throw new Error(message || `Request failed: ${response.status}`)
+    // MKJ 05/29/26 Try to parse structured error response
+    let errorCode = 'request_failed'
+    let errorMessage = `Request failed: ${response.status}`
+    
+    try {
+      const json = await response.json()
+      if (json.code) errorCode = json.code
+      if (json.error) errorMessage = json.error
+    } catch {
+      // Fall back to text response if JSON parsing fails
+      const text = await response.text().catch(() => response.statusText)
+      if (text) errorMessage = text
+    }
+    
+    throw new ApiError(errorCode, errorMessage, response.status)
   }
 
   if (response.status === 204) {

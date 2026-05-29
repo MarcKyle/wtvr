@@ -5,6 +5,8 @@ import { ROLES, REGISTRATION_ROLES, type Role } from '../../constants/roles'
 import { ROUTES } from '../../constants/routes'
 import { homeForRole } from '../../routes/homeForRole'
 import { isStrongPassword, isValidEmail } from '../../utils/validators'
+import { getErrorMessage } from '../../constants/errors'
+import { ApiError } from '../../lib/api'
 import Button from '../../components/common/Button'
 import Loader from '../../components/common/Loader'
 
@@ -63,7 +65,12 @@ function Register() {
       const authed = await register({ email, password, role })
       navigate(homeForRole(authed.role), { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed.')
+      // MKJ 05/29/26 Map error code to user-friendly message
+      if (err instanceof ApiError) {
+        setError(getErrorMessage(err.code))
+      } else {
+        setError(err instanceof Error ? err.message : 'Registration failed.')
+      }
     } finally {
       setSubmitting(false)
     }

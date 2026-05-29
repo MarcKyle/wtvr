@@ -2,6 +2,7 @@ import { Router, type CookieOptions } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import { env, isProd } from '../config/env.js'
+import { ERROR_CODES } from '../constants/errors.js'
 import { activityRepo } from '../db/repositories/activityRepo.js'
 import { requireAuth } from '../middleware/auth.js'
 import { validateBody } from '../middleware/validate.js'
@@ -19,7 +20,8 @@ const authLimiter = rateLimit({
   max: env.rateLimit.authMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many auth attempts. Try again later.' },
+  // MKJ 05/29/26 Return structured error response for rate limit
+  message: { error: 'Too many attempts. Please try again later.', code: ERROR_CODES.TOO_MANY_ATTEMPTS },
 })
 
 // Strong password: min 8, mixed case, number, symbol. Mirrors src/utils/validators.ts.
@@ -74,14 +76,26 @@ router.post(
     const result = await login(email, password, clientCtx(req))
 
     if (!result.ok) {
-      const status = result.reason === 'locked' ? 423 : 401
-      const message =
-        result.reason === 'locked'
-          ? 'Account temporarily locked. Try again later.'
-          : result.reason === 'inactive'
-            ? 'Account is disabled.'
-            : 'Invalid email or password.'
-      res.status(status).json({ error: message })
+      // MKJ 05/29/26 Return structured error response with code
+      const statusMap = {
+        locked: 423,
+        inactive: 401,
+        invalid: 401,
+      }
+      const codeMap = {
+        locked: ERROR_CODES.ACCOUNT_LOCKED,
+        inactive: ERROR_CODES.ACCOUNT_INACTIVE,
+        invalid: ERROR_CODES.INVALID_CREDENTIALS,
+      }
+      const messageMap = {
+        locked: 'Account temporarily locked. Try again later.',
+        inactive: 'Account is disabled.',
+        invalid: 'Incorrect account details.',
+      }
+      const status = statusMap[result.reason]
+      const code = codeMap[result.reason]
+      const message = messageMap[result.reason]
+      res.status(status).json({ error: message, code })
       return
     }
 
@@ -103,12 +117,23 @@ router.post(
     const result = await register(email, password, role, clientCtx(req))
 
     if (!result.ok) {
-      const status = result.reason === 'forbidden_role' ? 403 : 409
-      const message =
-        result.reason === 'forbidden_role'
-          ? 'That role cannot be selected at registration.'
-          : 'An account with that email already exists.'
-      res.status(status).json({ error: message })
+      // MKJ 05/29/26 Return structured error response with code
+      const statusMap = {
+        forbidden_role: 403,
+        email_exists: 409,
+      }
+      const codeMap = {
+        forbidden_role: ERROR_CODES.INVALID_ROLE,
+        email_exists: ERROR_CODES.EMAIL_ALREADY_EXISTS,
+      }
+      const messageMap = {
+        forbidden_role: 'That role cannot be selected at registration.',
+        email_exists: 'An account with that email already exists.',
+      }
+      const status = statusMap[result.reason]
+      const code = codeMap[result.reason]
+      const message = messageMap[result.reason]
+      res.status(status).json({ error: message, code })
       return
     }
 

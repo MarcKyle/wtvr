@@ -4,8 +4,11 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import helmet from 'helmet'
 import { env, isProd } from './config/env.js'
+import { ERROR_CODES } from './constants/errors.js'
 import { attachUser } from './middleware/auth.js'
 import authRoutes from './routes/auth.js'
+import adminRoutes from './routes/admin.js'
+import profileRoutes from './routes/profile.js'
 import { logger } from './utils/logger.js'
 
 const app = express()
@@ -40,10 +43,12 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/profile', profileRoutes)
 
 // Final 404 for any unmatched /api/* route.
 app.use('/api', (_req, res) => {
-  res.status(404).json({ error: 'Not found.' })
+  res.status(404).json({ error: 'Not found.', code: ERROR_CODES.REQUEST_FAILED })
 })
 
 app.use(
@@ -54,8 +59,10 @@ app.use(
     _next: express.NextFunction,
   ) => {
     logger.error({ err }, 'Unhandled error')
+    // MKJ 05/29/26 Return structured error response with code
     res.status(500).json({
       error: isProd ? 'Internal server error.' : (err as Error).message,
+      code: ERROR_CODES.SERVER_ERROR,
     })
   },
 )

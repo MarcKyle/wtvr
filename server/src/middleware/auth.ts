@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express'
 import { env } from '../config/env.js'
+import { ERROR_CODES } from '../constants/errors.js'
 import { sessionRepo } from '../db/repositories/sessionRepo.js'
 import { userRepo, type DbUser } from '../db/repositories/userRepo.js'
 
@@ -43,7 +44,11 @@ export function requireAuth(
   next: NextFunction,
 ): void {
   if (!req.user) {
-    res.status(401).json({ error: 'Authentication required.' })
+    // MKJ 05/29/26 Return structured error response with code
+    res.status(401).json({ 
+      error: 'Authentication required.', 
+      code: ERROR_CODES.AUTHENTICATION_REQUIRED 
+    })
     return
   }
   next()
@@ -52,11 +57,19 @@ export function requireAuth(
 export function requireRole(...allowed: Array<DbUser['role']>) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
-      res.status(401).json({ error: 'Authentication required.' })
+      // MKJ 05/29/26 Return structured error response with code
+      res.status(401).json({ 
+        error: 'Authentication required.', 
+        code: ERROR_CODES.AUTHENTICATION_REQUIRED 
+      })
       return
     }
     if (!allowed.includes(req.user.role)) {
-      res.status(403).json({ error: 'Forbidden.' })
+      // MKJ 05/29/26 Return structured error response with code
+      res.status(403).json({ 
+        error: 'You do not have permission to access this.', 
+        code: ERROR_CODES.FORBIDDEN 
+      })
       return
     }
     next()
