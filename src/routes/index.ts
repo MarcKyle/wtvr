@@ -1,2 +1,4 @@
-// Re-exports route helpers. When react-router is added, register routes here.
+// Re-exports for route helpers and route-level components.
 export { default as ProtectedRoute } from './ProtectedRoute'
+export { default as RootRedirect } from './RootRedirect'
+export { homeForRole } from './homeForRole'
