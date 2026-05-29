@@ -11,7 +11,6 @@ import NotFound from './pages/NotFound'
 import { ProtectedRoute, RootRedirect } from './routes'
 import { ROLES } from './constants/roles'
 import { ROUTES } from './constants/routes'
-import './styles/App.css'
 
 // Top-level router. Login is the entry point of the app: the root path
 // redirects unauthenticated visitors to /login and authenticated users to

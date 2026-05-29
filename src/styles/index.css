@@ -115,3 +115,632 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* ─────────────────────────────────────────────
+   Login split-screen layout
+   ───────────────────────────────────────────── */
+
+:root {
+  --login-accent: #2563eb;          /* solid blue */
+  --login-accent-hover: #1d4ed8;
+  --login-left-bg: #0f172a;         /* deep navy */
+  --login-left-text: #f8fafc;
+  --login-right-bg: #ffffff;
+  --login-input-border: #d1d5db;
+  --login-input-focus: #2563eb;
+  --login-radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --login-right-bg: #111827;
+    --login-input-border: #374151;
+    --login-left-bg: #020617;
+  }
+}
+
+/* Full-viewport overlay that escapes the #root column */
+.login-split {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  z-index: 100;
+}
+
+/* ── Left panel ── */
+.login-split__left {
+  background: var(--login-left-bg);
+  display: flex;
+  align-items: flex-end;
+  padding: 56px 52px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle decorative circle */
+.login-split__left::before {
+  content: '';
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37,99,235,0.35) 0%, transparent 70%);
+  top: -120px;
+  right: -120px;
+  pointer-events: none;
+}
+
+.login-split__left-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.login-split__brand-mark {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--login-accent);
+  margin-bottom: 20px;
+}
+
+.login-split__headline {
+  font-size: clamp(36px, 4vw, 56px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  color: var(--login-left-text);
+  margin: 0;
+}
+
+/* ── Right panel ── */
+.login-split__right {
+  background: var(--login-right-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  overflow-y: auto;
+}
+
+.login-split__form-wrap {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Logo mark */
+.login-split__logo {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 24px;
+}
+
+.login-split__logo svg {
+  width: 100%;
+  height: 100%;
+}
+
+.login-split__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin: 0 0 6px;
+  letter-spacing: -0.4px;
+}
+
+.login-split__subtitle {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 28px;
+}
+
+/* ── Form ── */
+.login-split__form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.login-field__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+}
+
+.login-field__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 16px;
+  border: 1.5px solid var(--login-input-border);
+  border-radius: var(--login-radius);
+  font-size: 15px;
+  font-family: var(--sans);
+  color: var(--text-h);
+  background: transparent;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-field__input::placeholder {
+  color: #9ca3af;
+}
+
+.login-field__input:focus {
+  border-color: var(--login-input-focus);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* ── Error ── */
+.login-split__error {
+  font-size: 13px;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: left;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Submit button ── */
+.login-split__submit {
+  width: 100%;
+  padding: 12px;
+  background: var(--login-accent);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--sans);
+  border: none;
+  border-radius: var(--login-radius);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  margin-top: 4px;
+}
+
+.login-split__submit:hover:not(:disabled) {
+  background: var(--login-accent-hover);
+}
+
+.login-split__submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.login-split__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Footer links ── */
+.login-split__footer {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 20px;
+}
+
+.login-split__link {
+  color: var(--login-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-split__link:hover {
+  text-decoration: underline;
+}
+
+.login-split__link--muted {
+  color: var(--text);
+  font-weight: 400;
+}
+
+/* ── Responsive: stack vertically on narrow screens ── */
+@media (max-width: 768px) {
+  .login-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-split__left {
+    padding: 36px 28px 32px;
+    align-items: flex-start;
+  }
+
+  .login-split__left::before {
+    display: none;
+  }
+
+  .login-split__headline {
+    font-size: 32px;
+  }
+
+  .login-split__right {
+    padding: 36px 24px;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Register – role picker (reuses login-split layout)
+   ───────────────────────────────────────────── */
+
+.reg-role-picker {
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.reg-role-picker__legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  float: left;
+  width: 100%;
+}
+
+.reg-role-picker__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.reg-role-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 14px;
+  border: 1.5px solid var(--login-input-border);
+  border-radius: var(--login-radius);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-align: left;
+}
+
+.reg-role-option--active {
+  border-color: var(--login-accent);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.reg-role-option__input {
+  margin-top: 3px;
+  accent-color: var(--login-accent);
+  flex-shrink: 0;
+}
+
+.reg-role-option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reg-role-option__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.reg-role-option__hint {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* ─────────────────────────────────────────────
+   Reader dashboard – three-column layout
+   ───────────────────────────────────────────── */
+
+.reader-dashboard {
+  display: grid;
+  grid-template-columns: 220px 1fr 220px;
+  grid-template-areas: 'left centre right';
+  gap: 0;
+  align-items: start;
+  min-height: 100%;
+  text-align: left;
+}
+
+/* ── Shared sidebar chrome ── */
+.reader-sidebar {
+  padding: 28px 20px;
+  position: sticky;
+  top: 0;
+  max-height: 100svh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.reader-sidebar--left {
+  grid-area: left;
+  border-right: 1px solid var(--border);
+}
+
+.reader-sidebar--right {
+  grid-area: right;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── Centre feed ── */
+.reader-feed {
+  grid-area: centre;
+  padding: 28px 32px;
+  box-sizing: border-box;
+}
+
+.reader-feed__header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reader-feed__title {
+  font-size: 36px;
+  letter-spacing: -0.8px;
+  margin: 4px 0 8px;
+
+  @media (max-width: 1024px) {
+    font-size: 28px;
+  }
+}
+
+.reader-feed__lede {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+/* ── Shared sidebar heading ── */
+.sidebar-heading {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin: 0 0 14px;
+}
+
+/* ── Left sidebar: post list ── */
+.post-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.post-list__item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.post-list__item:last-child {
+  border-bottom: none;
+}
+
+.post-list__item:hover .post-list__title {
+  color: var(--accent);
+}
+
+.post-list__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.35;
+  margin: 0 0 4px;
+  transition: color 0.12s;
+}
+
+.post-list__meta {
+  font-size: 11px;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ── Centre: activity feed cards ── */
+.activity-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activity-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.activity-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow);
+}
+
+.activity-card__avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+}
+
+.activity-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.activity-card__text {
+  font-size: 14px;
+  color: var(--text-h);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.activity-card__actor {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.activity-card__time {
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ── Right sidebar: trending ── */
+.trending-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.trending-list__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.trending-list__item:last-child {
+  border-bottom: none;
+}
+
+.trending-list__item:hover .trending-list__title {
+  color: var(--accent);
+}
+
+.trending-list__rank {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+  min-width: 14px;
+  padding-top: 2px;
+}
+
+.trending-list__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.35;
+  margin: 0 0 3px;
+  transition: color 0.12s;
+}
+
+.trending-list__author {
+  font-size: 11px;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ── Right sidebar: announcements ── */
+.announcement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.announcement-list__item {
+  padding: 10px 12px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+}
+
+.announcement-list__text {
+  font-size: 13px;
+  color: var(--text-h);
+  line-height: 1.45;
+  margin: 0 0 5px;
+}
+
+.announcement-list__date {
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* ── Eyebrow label (shared) ── */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+
+/* ── Responsive: collapse to single column on narrow screens ── */
+@media (max-width: 900px) {
+  .reader-dashboard {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'centre'
+      'left'
+      'right';
+  }
+
+  .reader-sidebar {
+    position: static;
+    max-height: none;
+    border: none;
+    border-top: 1px solid var(--border);
+    padding: 20px 16px;
+  }
+
+  .reader-feed {
+    padding: 20px 16px;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1024px) {
+  .reader-dashboard {
+    grid-template-columns: 180px 1fr 180px;
+  }
+}
