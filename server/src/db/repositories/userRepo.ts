@@ -161,6 +161,57 @@ export const userRepo = {
     return updated
   },
 
+  /** List all users with pagination. MKJ 05/30/26 Admin user listing. */
+  async list(limit: number = 50, offset: number = 0): Promise<[users: DbUser[], total: number]> {
+    const [rows] = await pool.execute<UserJoinRow[]>(
+      `${SELECT_USER} ORDER BY u.created_at DESC LIMIT ? OFFSET ?`,
+      [limit, offset],
+    )
+    
+    const [[countRow]] = await pool.execute<(RowDataPacket & { total: number })[]>(
+      'SELECT COUNT(*) AS total FROM users',
+    )
+    
+    return [rows.map(mapUser), countRow?.total ?? 0]
+  },
+
+  /** Update user role. MKJ 05/30/26 Admin role management. */
+  async updateRole(userId: number, newRole: 'admin' | 'author' | 'reader'): Promise<DbUser> {
+    await pool.execute(
+      `UPDATE users
+         SET role_id = (SELECT id FROM roles WHERE name = ? LIMIT 1)
+       WHERE id = ?`,
+      [newRole, userId],
+    )
+
+    const updated = await this.findById(userId)
+    if (!updated) throw new Error('User not found after role update')
+    return updated
+  },
+
+  /** Update user active status. MKJ 05/30/26 Admin user activation. */
+  async updateActive(userId: number, isActive: boolean): Promise<DbUser> {
+    await pool.execute(
+      `UPDATE users SET is_active = ? WHERE id = ?`,
+      [isActive ? 1 : 0, userId],
+    )
+
+    const updated = await this.findById(userId)
+    if (!updated) throw new Error('User not found after status update')
+    return updated
+  },
+
+  /** Delete a user by ID. MKJ 05/30/26 Admin user deletion. */
+  async delete(userId: number): Promise<void> {
+    const [res] = await pool.execute<ResultSetHeader>(
+      'DELETE FROM users WHERE id = ?',
+      [userId],
+    )
+    if (res.affectedRows === 0) {
+      throw new Error('User not found')
+    }
+  },
+
   /** Aggregate counts used by the admin dashboard. */
   async getStats(): Promise<UserStats> {    const [[userRow]] = await pool.execute<(RowDataPacket & {
       total: number; active: number; authors: number; readers: number

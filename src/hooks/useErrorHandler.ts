@@ -5,7 +5,6 @@ import { getErrorMessage } from '../constants/errors'
 
 export type ErrorHandler = (error: unknown) => string
 
-// MKJ 05/29/26 Returns a function that converts any error to a user-friendly message
 export function useErrorHandler(): ErrorHandler {
   return useCallback((error: unknown): string => {
     if (error instanceof ApiError) {

@@ -106,11 +106,11 @@ export const activityRepo = {
     outcome?: ActivityOutcome | null
   }): Promise<number> {
     const conditions: string[] = []
-    const params: (Date | string)[] = []
+    const params: (string)[] = []
 
     if (opts.since) {
       conditions.push('created_at >= ?')
-      params.push(opts.since)
+      params.push(opts.since.toISOString())
     }
     if (opts.outcome) {
       conditions.push('outcome = ?')

@@ -259,6 +259,266 @@ function OverviewPanel() {
     </div>
   )
 }
+// ─── Users Panel ──────────────────────────────────────────────────────────────
+
+type AdminUser = {
+  id: number
+  email: string
+  role: 'admin' | 'author' | 'reader'
+  isActive: boolean
+  createdAt: string
+  displayName: string | null
+}
+
+type UsersResponse = {
+  users: AdminUser[]
+  total: number
+  limit: number
+  offset: number
+}
+
+function UsersPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [formData, setFormData] = useState({ email: '', password: '', role: 'reader' as const })
+
+  const PAGE_SIZE = 50
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.get<UsersResponse>(`/admin/users?limit=${PAGE_SIZE}&offset=${offset}`)
+      setUsers(data.users)
+      setTotal(data.total)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load users.')
+    } finally {
+      setLoading(false)
+    }
+  }, [offset])
+
+  useEffect(() => { void load() }, [load])
+
+  // MKJ 05/30/26 Admin user add function
+  async function handleAddUser() {
+    if (!formData.email || !formData.password) {
+      setError('Email and password required.')
+      return
+    }
+    try {
+      const newUser = await api.post<AdminUser>('/admin/users', {
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+      })
+      setUsers([newUser, ...users])
+      setFormData({ email: '', password: '', role: 'reader' })
+      setShowAddForm(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create user.')
+    }
+  }
+
+  // MKJ 05/30/26 Admin user update function
+  async function handleUpdateUser(userId: number, role: string, isActive: boolean) {
+    try {
+      const updated = await api.put<AdminUser>(`/admin/users/${userId}`, { role, isActive })
+      setUsers(users.map(u => u.id === userId ? updated : u))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update user.')
+    }
+  }
+
+  // MKJ 05/30/26 Admin user delete function
+  async function handleDeleteUser(userId: number) {
+    if (!window.confirm('Are you sure you want to delete this user?')) return
+    try {
+      await api.delete(`/admin/users/${userId}`)
+      setUsers(users.filter(u => u.id !== userId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user.')
+    }
+  }
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-sm font-semibold text-[#e6edf3] mb-1" style={{ fontSize: '14px', letterSpacing: 'normal', margin: '0 0 4px' }}>
+          User management
+        </h2>
+        <p className="text-xs text-[#636e7b]">Add, edit, and manage user accounts across all roles.</p>
+      </div>
+
+      {error && <ErrorBanner message={error} onRetry={load} />}
+
+      {/* Add User Form */}
+      {showAddForm && (
+        <div className="p-4 rounded-xl bg-[#161b22] border border-[#30363d] space-y-3">
+          <h3 className="text-sm font-semibold text-[#e6edf3]">Add new user</h3>
+          <div className="space-y-2">
+            <input
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm focus:outline-none focus:border-[#388bfd]"
+            />
+            <input
+              type="password"
+              placeholder="Password (min 8 characters)"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm focus:outline-none focus:border-[#388bfd]"
+            />
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
+              className="w-full px-3 py-2 rounded-lg bg-[#0d1117] border border-[#30363d] text-[#e6edf3] text-sm focus:outline-none focus:border-[#388bfd] cursor-pointer"
+            >
+              <option value="reader">Reader</option>
+              <option value="author">Author</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#21262d] border border-[#30363d] text-[#adbac7] hover:bg-[#30363d] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddUser}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
+            >
+              Add user
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-[#636e7b]">
+          {loading ? '…' : `${total} ${total === 1 ? 'user' : 'users'}`}
+        </span>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z" />
+          </svg>
+          Add user
+        </button>
+      </div>
+
+      {/* Users Table */}
+      <div className="rounded-xl border border-[#30363d] overflow-hidden overflow-x-auto">
+        <table className="w-full text-xs" role="grid" aria-label="Users">
+          <thead>
+            <tr className="bg-[#161b22] border-b border-[#30363d]">
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest text-[#636e7b]">Email</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest text-[#636e7b]">Role</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest text-[#636e7b]">Status</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest text-[#636e7b]">Joined</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest text-[#636e7b]">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#30363d]">
+            {loading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="bg-[#0d1117]">
+                  {Array.from({ length: 5 }).map((__, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <span className="block h-3 rounded bg-[#21262d] animate-pulse" style={{ width: `${60 + (i * j * 7) % 40}%` }} />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-10 text-center text-[#636e7b]">
+                  No users yet. Add one to get started.
+                </td>
+              </tr>
+            ) : (
+              users.map((user) => (
+                <tr key={user.id} className="bg-[#0d1117] hover:bg-[#161b22] transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-[#388bfd] max-w-[200px] truncate">{user.email}</td>
+                  <td className="px-4 py-2.5">
+                    <select
+                      value={user.role}
+                      onChange={(e) => handleUpdateUser(user.id, e.target.value, user.isActive)}
+                      className="bg-[#21262d] border border-[#30363d] text-[#adbac7] text-xs rounded px-2 py-1 focus:outline-none focus:border-[#388bfd] cursor-pointer"
+                    >
+                      <option value="reader">Reader</option>
+                      <option value="author">Author</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => handleUpdateUser(user.id, user.role, !user.isActive)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
+                        user.isActive
+                          ? 'bg-[#1a4731] text-[#3fb950] border-[#2ea043]/40'
+                          : 'bg-[#3d1a1a] text-[#f85149] border-[#f85149]/30'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-[#3fb950]' : 'bg-[#f85149]'}`} aria-hidden="true" />
+                      {user.isActive ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+                  <td className="px-4 py-2.5 text-[#636e7b] whitespace-nowrap">{formatDate(user.createdAt)}</td>
+                  <td className="px-4 py-2.5">
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="text-[#f85149] hover:text-[#ff7b72] transition-colors text-xs font-medium"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-xs text-[#636e7b]">
+          <span>Page {currentPage} of {totalPages}</span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
+              disabled={offset === 0 || loading}
+              className="px-3 py-1.5 rounded-lg bg-[#21262d] border border-[#30363d] text-[#adbac7] hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Prev
+            </button>
+            <button
+              onClick={() => setOffset((o) => o + PAGE_SIZE)}
+              disabled={offset + PAGE_SIZE >= total || loading}
+              className="px-3 py-1.5 rounded-lg bg-[#21262d] border border-[#30363d] text-[#adbac7] hover:bg-[#30363d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 
 // ─── Placeholder panels ───────────────────────────────────────────────────────
@@ -550,7 +810,7 @@ function Admin() {
   function renderContent() {
     switch (activeSection) {
       case 'overview': return <OverviewPanel />
-      case 'users':    return <PlaceholderPanel title="User management" description="Manage user accounts, roles, and access controls. Coming soon." />
+      case 'users':    return <UsersPanel />
       case 'posts':    return <PlaceholderPanel title="Content management" description="Review, hide, or remove posts across all authors. Coming soon." />
       case 'reports':  return <ReportsPanel />
     }

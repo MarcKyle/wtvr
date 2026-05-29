@@ -1,7 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
+import { api } from '../../lib/api'
+
+// ─── Types ────────────────────────────────────────────────────────────────
+
+type Post = {
+  id: number
+  title: string
+  body: string
+  author: {
+    id: number
+    email: string
+    displayName: string | null
+  }
+  createdAt: string
+  updatedAt: string
+}
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -49,120 +65,85 @@ type FeedItem = {
   thumbnailColor: string
 }
 
-const FEED: FeedItem[] = [
-  {
-    id: 1,
-    author: { handle: 'ada_writes', displayName: 'Ada Lovelace', initials: 'AL', color: '#7c3aed' },
+// Helper function to generate author color from email
+function getAuthorColor(email: string): string {
+  const colors = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#14b8a6']
+  let hash = 0
+  for (let i = 0; i < email.length; i++) {
+    hash = email.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return colors[Math.abs(hash) % colors.length]
+}
+
+// Helper function to get initials from display name or email
+function getInitials(displayName: string | null, email: string): string {
+  if (displayName) {
+    const parts = displayName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    }
+    return displayName.slice(0, 2).toUpperCase()
+  }
+  return email.slice(0, 2).toUpperCase()
+}
+
+// Helper function to format timestamp
+function formatTimestamp(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
+  return date.toLocaleDateString()
+}
+
+// Helper function to estimate read time
+function estimateReadTime(text: string): string {
+  const wordsPerMinute = 200
+  const words = text.trim().split(/\s+/).length
+  const minutes = Math.max(1, Math.ceil(words / wordsPerMinute))
+  return `${minutes} min read`
+}
+
+// Helper function to get thumbnail color
+function getThumbnailColor(index: number): string {
+  const colors = ['#1e1b4b', '#0c1a2e', '#052e16', '#1c1400', '#450a0a', '#1e1b4b']
+  return colors[index % colors.length]
+}
+
+// Helper function to convert Post to FeedItem
+function postToFeedItem(post: Post, index: number): FeedItem {
+  const displayName = post.author.displayName || post.author.email.split('@')[0]
+  const handle = post.author.email.split('@')[0]
+  const color = getAuthorColor(post.author.email)
+  const initials = getInitials(post.author.displayName, post.author.email)
+  
+  return {
+    id: post.id,
+    author: {
+      handle,
+      displayName,
+      initials,
+      color,
+    },
     action: 'published',
-    title: 'On the Nature of Analytical Engines',
-    preview: 'The engine can arrange and combine its numerical quantities exactly as if they were letters or any other general symbols — and in fact it might bring out its results in algebraical notation.',
-    timestamp: '3 minutes ago',
-    readTime: '5 min read',
-    likes: 142,
-    bookmarks: 38,
-    comments: 17,
-    thumbnailLabel: 'ESSAY',
-    thumbnailColor: '#1e1b4b',
-  },
-  {
-    id: 2,
-    author: { handle: 'turing_ink', displayName: 'Alan Turing', initials: 'AT', color: '#0ea5e9' },
-    action: 'published',
-    title: 'Can Machines Think? A Revisitation',
-    preview: 'I propose to consider the question "Can machines think?" This should begin with definitions of the meaning of the terms "machine" and "think" — but the definitions might be framed so as to reflect so far as possible the normal use of the words.',
-    timestamp: '23 minutes ago',
-    readTime: '8 min read',
-    likes: 289,
-    bookmarks: 91,
-    comments: 44,
-    thumbnailLabel: 'THEORY',
-    thumbnailColor: '#0c1a2e',
-  },
-  {
-    id: 3,
-    author: { handle: 'grace_h', displayName: 'Grace Hopper', initials: 'GH', color: '#10b981' },
-    action: 'recommended',
-    title: 'The Most Dangerous Phrase in Engineering',
-    preview: '"We\'ve always done it this way." Those six words have killed more good ideas than any budget cut or technical constraint. The willingness to question inherited assumptions is the single most valuable trait in any engineer.',
-    timestamp: '2 hours ago',
-    readTime: '3 min read',
-    likes: 517,
-    bookmarks: 204,
-    comments: 63,
-    thumbnailLabel: 'OPINION',
-    thumbnailColor: '#052e16',
-  },
-  {
-    id: 4,
-    author: { handle: 'djikstra_d', displayName: 'Edsger Dijkstra', initials: 'ED', color: '#f59e0b' },
-    action: 'published',
-    title: 'Why Simplicity Is the Ultimate Sophistication',
-    preview: 'Simplicity is a great virtue but it requires hard work to achieve it and education to appreciate it. And to make matters worse: complexity sells better. We must resist the temptation to equate sophistication with complication.',
-    timestamp: '5 hours ago',
-    readTime: '6 min read',
-    likes: 388,
-    bookmarks: 127,
-    comments: 29,
-    thumbnailLabel: 'CRAFT',
-    thumbnailColor: '#1c1400',
-  },
-  {
-    id: 5,
-    author: { handle: 'ada_writes', displayName: 'Ada Lovelace', initials: 'AL', color: '#7c3aed' },
-    action: 'published',
-    title: 'Notes on Imagination and Formal Systems',
-    preview: 'Imagination is the faculty of discovering things unknown to us, by forming new combinations of ideas. The Analytical Engine has no power of originating anything — it can only do what we know how to order it to perform.',
-    timestamp: '13 hours ago',
-    readTime: '4 min read',
-    likes: 201,
-    bookmarks: 55,
-    comments: 11,
-    thumbnailLabel: 'NOTES',
-    thumbnailColor: '#1e1b4b',
-  },
-  {
-    id: 6,
-    author: { handle: 'turing_ink', displayName: 'Alan Turing', initials: 'AT', color: '#0ea5e9' },
-    action: 'recommended',
-    title: 'Morphogenesis and the Mathematics of Form',
-    preview: 'The purpose of this paper is to discuss a possible mechanism by which the genes of a zygote may determine the anatomical structure of the resulting organism. A model of the embryo will be described in which the chemical reaction and diffusion are the only processes assumed.',
-    timestamp: '1 day ago',
-    readTime: '11 min read',
-    likes: 176,
-    bookmarks: 82,
-    comments: 22,
-    thumbnailLabel: 'SCIENCE',
-    thumbnailColor: '#0c1a2e',
-  },
-  {
-    id: 7,
-    author: { handle: 'grace_h', displayName: 'Grace Hopper', initials: 'GH', color: '#10b981' },
-    action: 'published',
-    title: 'Debugging as a Way of Thinking',
-    preview: 'A ship in port is safe, but that\'s not what ships are for. The same is true of software. A program that never runs never fails — but it also never does anything. Debugging is not a sign of failure; it is the practice of understanding.',
-    timestamp: '2 days ago',
-    readTime: '5 min read',
-    likes: 443,
-    bookmarks: 168,
-    comments: 37,
-    thumbnailLabel: 'CRAFT',
-    thumbnailColor: '#052e16',
-  },
-  {
-    id: 8,
-    author: { handle: 'djikstra_d', displayName: 'Edsger Dijkstra', initials: 'ED', color: '#f59e0b' },
-    action: 'recommended',
-    title: 'The Humble Programmer',
-    preview: 'The competent programmer is fully aware of the strictly limited size of his own skull; therefore he approaches the programming task in full humility, and among other things he avoids clever tricks like the plague.',
-    timestamp: '3 days ago',
-    readTime: '7 min read',
-    likes: 612,
-    bookmarks: 241,
-    comments: 58,
-    thumbnailLabel: 'CLASSIC',
-    thumbnailColor: '#1c1400',
-  },
-]
+    title: post.title,
+    preview: post.body.slice(0, 200) + (post.body.length > 200 ? '...' : ''),
+    timestamp: formatTimestamp(post.createdAt),
+    readTime: estimateReadTime(post.body),
+    likes: Math.floor(Math.random() * 500) + 50, // Mock data for now
+    bookmarks: Math.floor(Math.random() * 200) + 20,
+    comments: Math.floor(Math.random() * 80) + 5,
+    thumbnailLabel: 'POST',
+    thumbnailColor: getThumbnailColor(index),
+  }
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -314,8 +295,33 @@ function ReaderHome() {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All posts')
   const [searchQuery, setSearchQuery] = useState('')
+  const [posts, setPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredFeed = FEED.filter((item) =>
+  // Fetch posts from API
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const response = await api.get<{ posts: Post[] }>('/posts')
+        setPosts(response.posts)
+      } catch (err) {
+        console.error('Failed to fetch posts:', err)
+        setError('Failed to load posts. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPosts()
+  }, [])
+
+  // Convert posts to feed items
+  const feedItems = posts.map((post, index) => postToFeedItem(post, index))
+
+  const filteredFeed = feedItems.filter((item) =>
     searchQuery.trim() === '' ||
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.author.displayName.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -465,7 +471,28 @@ function ReaderHome() {
           </div>
 
           {/* Feed cards */}
-          {filteredFeed.length > 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-[#636e7b]">
+              <svg className="animate-spin h-8 w-8 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <p className="text-sm">Loading posts...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 text-[#636e7b]">
+              <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mb-3 opacity-40" aria-hidden="true">
+                <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm9.78-2.22-5.5 5.5a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l5.5-5.5a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042Z" />
+              </svg>
+              <p className="text-sm mb-2">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-xs text-[#388bfd] hover:underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredFeed.length > 0 ? (
             <div>
               {filteredFeed.map((item) => (
                 <FeedCard key={item.id} item={item} />
@@ -476,7 +503,9 @@ function ReaderHome() {
               <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mb-3 opacity-40" aria-hidden="true">
                 <path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z" />
               </svg>
-              <p className="text-sm">No posts match your search.</p>
+              <p className="text-sm">
+                {searchQuery ? 'No posts match your search.' : 'No posts available yet.'}
+              </p>
             </div>
           )}
         </main>

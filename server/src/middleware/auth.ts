@@ -54,7 +54,7 @@ export function requireAuth(
   next()
 }
 
-export function requireRole(...allowed: Array<DbUser['role']>) {
+export function requireRole(allowed: Array<DbUser['role']>) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       // MKJ 05/29/26 Return structured error response with code

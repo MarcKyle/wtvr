@@ -1,53 +1,27 @@
-import { useState, useRef, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { ROUTES } from '../../constants/routes'
+import { api } from '../../lib/api'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PostStatus = 'draft' | 'published'
+type PostStatus = 'draft' | 'published' | 'hidden'
 
 type AuthorPost = {
   id: number
   title: string
   body: string
-  tags: string[]
-  imageName: string | null
   status: PostStatus
+  createdAt: string
   updatedAt: string
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+type ApiPostResponse = {
+  posts: AuthorPost[]
+}
 
-const SAMPLE_POSTS: AuthorPost[] = [
-  {
-    id: 101,
-    title: 'First thoughts',
-    body: 'Just a short note while the editor is still a placeholder.',
-    tags: ['personal', 'notes'],
-    imageName: null,
-    status: 'published',
-    updatedAt: '2 days ago',
-  },
-  {
-    id: 102,
-    title: 'Untitled draft',
-    body: 'Working on a longer piece. Not ready yet.',
-    tags: ['draft'],
-    imageName: null,
-    status: 'draft',
-    updatedAt: 'yesterday',
-  },
-  {
-    id: 103,
-    title: 'On writing plainly',
-    body: 'Clarity beats cleverness every time. Short sentences. Active voice.',
-    tags: ['writing', 'craft'],
-    imageName: 'cover.jpg',
-    status: 'published',
-    updatedAt: '5 days ago',
-  },
-]
+// ─── Navigation items ─────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
   {
@@ -80,12 +54,23 @@ const NAV_ITEMS = [
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: PostStatus }) {
-  return status === 'published' ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#1a4731] text-[#3fb950] border border-[#2ea043]/40">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#3fb950]" aria-hidden="true" />
-      Published
-    </span>
-  ) : (
+  if (status === 'published') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#1a4731] text-[#3fb950] border border-[#2ea043]/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#3fb950]" aria-hidden="true" />
+        Published
+      </span>
+    )
+  }
+  if (status === 'hidden') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#2d2d2d] text-[#8b949e] border border-[#30363d]">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#8b949e]" aria-hidden="true" />
+        Hidden
+      </span>
+    )
+  }
+  return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#2d2208] text-[#d29922] border border-[#9e6a03]/40">
       <span className="w-1.5 h-1.5 rounded-full bg-[#d29922]" aria-hidden="true" />
       Draft
@@ -164,29 +149,29 @@ function ComposeScreen({
   onClose,
 }: {
   mode: ComposeMode
-  onSave: (data: Omit<AuthorPost, 'id' | 'updatedAt'>) => void
+  onSave: (data: Omit<AuthorPost, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   onClose: () => void
 }) {
   const editing = mode.type === 'edit' ? mode.post : null
   const [title, setTitle] = useState(editing?.title ?? '')
   const [body, setBody] = useState(editing?.body ?? '')
-  const [tagInput, setTagInput] = useState(editing?.tags.join(', ') ?? '')
-  const [imageName, setImageName] = useState<string | null>(editing?.imageName ?? null)
   const [status, setStatus] = useState<PostStatus>(editing?.status ?? 'draft')
   const [error, setError] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [saving, setSaving] = useState(false)
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) setImageName(file.name)
-  }
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!title.trim()) { setError('Title is required.'); return }
     if (!body.trim()) { setError('Body is required.'); return }
-    const tags = tagInput.split(',').map((t) => t.trim()).filter(Boolean)
-    onSave({ title: title.trim(), body: body.trim(), tags, imageName, status })
+    
+    setSaving(true)
+    setError(null)
+    try {
+      await onSave({ title: title.trim(), body: body.trim(), status })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save post')
+      setSaving(false)
+    }
   }
 
   return (
@@ -252,55 +237,6 @@ function ComposeScreen({
             />
           </div>
 
-          {/* Tags */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="post-tags" className="text-xs font-semibold text-[#adbac7] tracking-wide uppercase">
-              Tags
-              <span className="ml-1.5 text-[#636e7b] font-normal normal-case tracking-normal">comma-separated</span>
-            </label>
-            <input
-              id="post-tags"
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              placeholder="writing, personal, tech…"
-              className="w-full bg-[#161b22] border border-[#30363d] rounded-lg px-4 py-2.5 text-sm text-[#e6edf3] placeholder-[#636e7b] focus:outline-none focus:border-[#388bfd] focus:ring-1 focus:ring-[#388bfd] transition-colors"
-            />
-          </div>
-
-          {/* Image upload */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-semibold text-[#adbac7] tracking-wide uppercase">Cover image</span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-[#21262d] border border-[#30363d] text-[#adbac7] hover:bg-[#30363d] hover:border-[#636e7b] transition-colors"
-              >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                  <path d="M8.75 1.75a.75.75 0 0 0-1.5 0V7H2.75a.75.75 0 0 0 0 1.5H7.25v5.25a.75.75 0 0 0 1.5 0V8.5h4.5a.75.75 0 0 0 0-1.5H8.75V1.75Z" />
-                </svg>
-                Choose file
-              </button>
-              <span className="text-xs text-[#636e7b] truncate max-w-[200px]">
-                {imageName ?? 'No file chosen'}
-              </span>
-              {imageName && (
-                <button
-                  type="button"
-                  onClick={() => setImageName(null)}
-                  aria-label="Remove image"
-                  className="text-[#636e7b] hover:text-[#f85149] transition-colors"
-                >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                    <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
-                  </svg>
-                </button>
-              )}
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} aria-label="Upload cover image" />
-            </div>
-          </div>
-
           {/* Error */}
           {error && (
             <p role="alert" className="text-xs text-[#f85149] bg-[#3d1a1a] border border-[#f85149]/30 rounded-lg px-3 py-2">
@@ -314,16 +250,17 @@ function ComposeScreen({
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#768390]">Save as:</span>
               <div className="flex rounded-lg overflow-hidden border border-[#30363d]">
-                {(['draft', 'published'] as PostStatus[]).map((s) => (
+                {(['draft', 'published', 'hidden'] as PostStatus[]).map((s) => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => setStatus(s)}
+                    disabled={saving}
                     className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                       status === s
                         ? 'bg-[#388bfd] text-white'
                         : 'bg-[#161b22] text-[#768390] hover:text-[#adbac7] hover:bg-[#21262d]'
-                    }`}
+                    } ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {s}
                   </button>
@@ -335,15 +272,17 @@ function ComposeScreen({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-transparent border border-[#30363d] text-[#adbac7] hover:bg-[#21262d] transition-colors"
+                disabled={saving}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-transparent border border-[#30363d] text-[#adbac7] hover:bg-[#21262d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#238636] hover:bg-[#2ea043] text-white border border-[#2ea043]/40 transition-colors"
+                disabled={saving}
+                className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#238636] hover:bg-[#2ea043] text-white border border-[#2ea043]/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {mode.type === 'create' ? 'Publish' : 'Save changes'}
+                {saving ? 'Saving...' : mode.type === 'create' ? 'Publish' : 'Save changes'}
               </button>
             </div>
           </div>
@@ -360,12 +299,29 @@ type NavFilter = 'All posts' | 'Published' | 'Drafts'
 function AuthorHome() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [posts, setPosts] = useState<AuthorPost[]>(SAMPLE_POSTS)
+  const [posts, setPosts] = useState<AuthorPost[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeNav, setActiveNav] = useState<NavFilter>('All posts')
   const [composeMode, setComposeMode] = useState<ComposeMode | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AuthorPost | null>(null)
 
   const initials = user?.email ? user.email[0].toUpperCase() : '?'
+
+  // Fetch posts on mount
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        setLoading(true)
+        const data = await api.get<ApiPostResponse>('/posts/my-posts')
+        setPosts(data.posts)
+      } catch (err) {
+        console.error('Failed to fetch posts:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchPosts()
+  }, [])
 
   const filteredPosts = posts.filter((p) => {
     if (activeNav === 'Published') return p.status === 'published'
@@ -373,21 +329,27 @@ function AuthorHome() {
     return true
   })
 
-  function handleSave(data: Omit<AuthorPost, 'id' | 'updatedAt'>) {
+  async function handleSave(data: Omit<AuthorPost, 'id' | 'createdAt' | 'updatedAt'>) {
     if (composeMode?.type === 'edit') {
       const id = composeMode.post.id
-      setPosts((prev) => prev.map((p) => p.id === id ? { ...p, ...data, updatedAt: 'just now' } : p))
+      const updated = await api.patch<{ post: AuthorPost }>(`/posts/${id}`, data)
+      setPosts((prev) => prev.map((p) => p.id === id ? updated.post : p))
     } else {
-      const next: AuthorPost = { id: Date.now(), ...data, updatedAt: 'just now' }
-      setPosts((prev) => [next, ...prev])
+      const created = await api.post<{ post: AuthorPost }>('/posts', data)
+      setPosts((prev) => [created.post, ...prev])
     }
     setComposeMode(null)
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!deleteTarget) return
-    setPosts((prev) => prev.filter((p) => p.id !== deleteTarget.id))
-    setDeleteTarget(null)
+    try {
+      await api.delete(`/posts/${deleteTarget.id}`)
+      setPosts((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      setDeleteTarget(null)
+    } catch (err) {
+      console.error('Failed to delete post:', err)
+    }
   }
 
   async function handleLogout() {
@@ -396,6 +358,22 @@ function AuthorHome() {
 
   const publishedCount = posts.filter((p) => p.status === 'published').length
   const draftCount = posts.filter((p) => p.status === 'draft').length
+
+  // Format relative time
+  function formatRelativeTime(dateStr: string): string {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+    return date.toLocaleDateString()
+  }
 
   return (
     <div className="page-reset min-h-screen bg-[#0d1117] text-[#e6edf3] font-sans text-left">
@@ -524,7 +502,15 @@ function AuthorHome() {
           </div>
 
           {/* Post list */}
-          {filteredPosts.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 text-[#636e7b]">
+              <svg className="animate-spin h-8 w-8 mb-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p className="text-sm">Loading posts...</p>
+            </div>
+          ) : filteredPosts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-[#636e7b]">
               <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mb-3 opacity-30" aria-hidden="true">
                 <path d="M0 1.75A.75.75 0 0 1 .75 1h14.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 1.75Zm0 5A.75.75 0 0 1 .75 6h14.5a.75.75 0 0 1 0 1.5H.75A.75.75 0 0 1 0 6.75Zm0 5a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1-.75-.75Z" />
@@ -559,23 +545,7 @@ function AuthorHome() {
                       {post.body}
                     </p>
                     <div className="flex items-center gap-3 flex-wrap">
-                      {post.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-1.5 py-0.5 rounded text-[10px] bg-[#21262d] text-[#768390] border border-[#30363d]"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                      {post.imageName && (
-                        <span className="flex items-center gap-1 text-[10px] text-[#636e7b]">
-                          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                            <path d="M16 13.25A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25V2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75ZM1.75 2.5a.25.25 0 0 0-.25.25v7.655l2.9-2.9a.75.75 0 0 1 1.06 0l1.97 1.97 2.97-2.97a.75.75 0 0 1 1.06 0l2.04 2.04V2.75a.25.25 0 0 0-.25-.25Zm-.25 10.75c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-.917l-2.57-2.57-2.97 2.97a.749.749 0 0 1-1.06 0L5.93 10.56l-4.43 4.43Z" />
-                          </svg>
-                          {post.imageName}
-                        </span>
-                      )}
-                      <time className="text-[10px] text-[#636e7b] ml-auto">{post.updatedAt}</time>
+                      <time className="text-[10px] text-[#636e7b]">{formatRelativeTime(post.updatedAt)}</time>
                     </div>
                   </div>
 
