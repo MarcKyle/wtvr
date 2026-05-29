@@ -63,7 +63,7 @@ export const activityRepo = {
     outcome?: ActivityOutcome | null
   }): Promise<ActivityLogRow[]> {
     const conditions: string[] = []
-    const params: unknown[] = []
+    const params: (Date | string | number)[] = []
 
     if (opts.since) {
       conditions.push('al.created_at >= ?')
@@ -75,7 +75,7 @@ export const activityRepo = {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
-    params.push(opts.limit, opts.offset)
+    params.push(Math.floor(Number(opts.limit)), Math.floor(Number(opts.offset)))
 
     const [rows] = await pool.execute<RawLogRow[]>(
       `SELECT al.id, al.user_id, u.email AS user_email,
@@ -105,7 +105,7 @@ export const activityRepo = {
     outcome?: ActivityOutcome | null
   }): Promise<number> {
     const conditions: string[] = []
-    const params: unknown[] = []
+    const params: (Date | string)[] = []
 
     if (opts.since) {
       conditions.push('created_at >= ?')
